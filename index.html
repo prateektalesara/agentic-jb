@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Workflow Starter</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom spinner animation color */
+        .spinner-color {
+            border-top-color: #F59E0B; /* Tailwind amber-400 */
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-blue': '#3B82F6',   /* Used for icons/accents */
+                        'primary-green': '#10B981',  /* Used for success/deploy button */
+                        'primary-gold': '#F59E0B',   /* Used for loading/polling */
+                        'slate-900': '#0F172A',
+                        'slate-800': '#1E293B',
+                        'slate-700': '#334155',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex items-center justify-center font-sans p-4">
+
+    <div id="app" class="w-full max-w-2xl flex flex-col">
+
+        <!-- Header/Title Area -->
+        <div class="text-center mb-10 mt-10">
+            <h1 class="text-4xl font-bold tracking-tight text-gray-100 flex items-center justify-center">
+                <!-- Lucide-style Terminal icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-8 h-8 mr-3 text-primary-blue">
+                    <polyline points="4 17 10 11 4 5"></polyline>
+                    <line x1="12" y1="19" x2="20" y2="19"></line>
+                </svg>
+                LLM Workflow Starter
+            </h1>
+            <p class="text-gray-400 mt-2">Simulate an asynchronous job and deployment pipeline.</p>
+        </div>
+
+        <!-- Configuration Toggle -->
+        <div class="flex justify-end mb-4">
+            <div id="config-toggle-container" class="flex items-center p-2 rounded-lg transition-colors duration-300">
+                <!-- Lucide-style Settings icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 mr-2 text-gray-400">
+                    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.44a2 2 0 0 0-2 2h-.44a2 2 0 0 0-2 2v.44a2 2 0 0 0-2 2v.44a2 2 0 0 0 2 2h.44a2 2 0 0 0 2 2v.44a2 2 0 0 0 2 2h.44a2 2 0 0 0 2 2v.44a2 2 0 0 0 2 2h.44a2 2 0 0 0 2 2v-.44a2 2 0 0 0 2 2h.44a2 2 0 0 0 2 2v-.44a2 2 0 0 0 2-2v-.44a2 2 0 0 0 2-2v-.44a2 2 0 0 0 2-2v-.44a2 2 0 0 0-2-2h-.44a2 2 0 0 0-2-2v-.44a2 2 0 0 0-2-2h-.44a2 2 0 0 0-2-2v-.44a2 2 0 0 0-2-2z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+                <span id="api-mode-label" class="text-sm font-medium text-gray-200 mr-3">Mock API Mode</span>
+                
+                <button id="toggle-api-button" class="p-1 rounded-full transition-transform duration-300 focus:outline-none focus:ring-2 focus:ring-primary-blue" title="Toggle Mock/Real API">
+                    <!-- Lucide-style Toggle Right (Initial Mock state) -->
+                    <svg id="toggle-icon-right" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-7 h-7 text-primary-gold">
+                        <rect width="20" height="12" x="2" y="6" rx="6"></rect>
+                        <circle cx="18" cy="12" r="3"></circle>
+                    </svg>
+                    <!-- Lucide-style Toggle Left (Real API state - initially hidden) -->
+                    <svg id="toggle-icon-left" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-7 h-7 text-primary-blue hidden">
+                        <rect width="20" height="12" x="2" y="6" rx="6"></rect>
+                        <circle cx="6" cy="12" r="3"></circle>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Central Content Area (Deploy Button or Polling Status) -->
+        <div class="flex-grow flex flex-col items-center justify-center p-6 bg-slate-800 rounded-xl shadow-2xl transition-all duration-500">
+          
+            <!-- Main Status Indicator -->
+            <div class="mb-8 text-center">
+                <div id="main-status-icon" class="w-16 h-16 mx-auto mb-4">
+                    <!-- Icon placeholder -->
+                </div>
+                
+                <p id="message-display" class="text-lg transition-colors duration-500 text-gray-400">Enter your prompt to start the journey.</p>
+                <p id="journey-id-display" class="text-sm text-gray-500 mt-2 hidden">
+                    Journey ID: <span id="journey-id-value" class="font-mono text-primary-blue"></span>
+                </p>
+            </div>
+
+            <!-- Deployment Button -->
+            <button id="deploy-button" disabled class="mt-6 px-10 py-4 text-xl font-bold rounded-full bg-primary-green hover:bg-emerald-700 text-white shadow-lg transition-all duration-300 transform hover:scale-105 disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center hidden">
+                <span id="deploy-button-text" class="flex items-center">
+                    <!-- Lucide-style Check Circle icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 mr-2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                    Deploy Button
+                </span>
+            </button>
+
+            <!-- Reset Button -->
+            <button id="reset-button" class="mt-8 px-6 py-2 text-sm font-semibold rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-700 transition duration-200 flex items-center hidden">
+                <!-- Lucide-style Refresh Cw icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 mr-2">
+                    <path d="M23 4v6h-6"></path>
+                    <path d="M1 20v-6h6"></path>
+                    <path d="M3.5 9a9 9 0 0 1 17 0"></path>
+                    <path d="M20.5 15a9 9 0 0 1-17 0"></path>
+                </svg>
+                Start New Journey
+            </button>
+
+        </div>
+
+        <!-- Input Form at the Bottom (ChatGPT Style) -->
+        <div class="mt-8 mb-4">
+            <form id="query-form" class="relative">
+                <input
+                    type="text"
+                    id="query-input"
+                    placeholder="Type your query here..."
+                    class="w-full p-4 pr-12 text-lg bg-slate-700 text-gray-200 border border-slate-600 rounded-xl focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none transition-shadow duration-300 shadow-xl disabled:opacity-70 disabled:cursor-not-allowed"
+                />
+                <button
+                    type="submit"
+                    id="submit-button"
+                    class="absolute right-3 top-1/2 transform -translate-y-1/2 p-2 rounded-lg text-primary-blue hover:bg-slate-600 disabled:text-gray-500 disabled:hover:bg-transparent transition"
+                    aria-label="Submit Query"
+                >
+                    <!-- Lucide-style Send icon -->
+                    <svg id="submit-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </form>
+        </div>
+
+        <!-- Footer / Status Bar -->
+        <div class="text-xs text-gray-500 mt-4 flex items-center justify-center">
+            <span id="footer-message" class='mr-4'>Using mock API calls for demonstration.</span>
+            <!-- Wizard Logo SVG (Inline) -->
+            <svg width="24" height="24" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M400 240 L400 512 L112 512 L112 240 C112 120 400 120 400 240 Z" fill="#3B82F6"/>
+                <path d="M420 180 L350 100 L256 0 L162 100 L92 180 L420 180 Z" fill="#3B82F6"/>
+                <circle cx="256" cy="280" r="80" fill="#F3F4F6"/>
+                <path d="M256 200 C300 200 300 280 256 280 C212 280 212 200 256 200 Z" fill="#F3F4F6"/>
+                <rect x="200" y="300" width="112" height="30" rx="6" fill="#10B981"/>
+                <path d="M256 340 L286 370 L256 400 L226 370 Z" fill="#F59E0B"/>
+                <rect x="140" y="440" width="80" height="30" rx="6" fill="#3B82F6"/>
+                <rect x="292" y="440" width="80" height="30" rx="6" fill="#3B82F6"/>
+                <line x1="256" y1="330" x2="256" y2="340" stroke="#4B5563" stroke-width="4"/>
+                <line x1="256" y1="400" x2="256" y2="440" stroke="#4B5563" stroke-width="4"/>
+                <line x1="256" y1="440" x2="292" y2="440" stroke="#4B5563" stroke-width="4"/>
+                <line x1="256" y1="440" x2="220" y2="440" stroke="#4B5563" stroke-width="4"/>
+                <polygon points="400,200 408,210 420,210 412,220 415,232 400,225 385,232 388,220 380,210 392,210" fill="#F59E0B" transform="translate(10, -50) scale(1.5)"/>
+            </svg>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const REAL_API_URLS = {
+            SUBMIT: '/api/v1/submit-query',
+            STATUS: '/api/v1/poll-status',
+            DEPLOY: '/api/v1/deploy-journey',
+        };
+
+        // UI Element References
+        const queryInput = document.getElementById('query-input');
+        const submitButton = document.getElementById('submit-button');
+        const submitIcon = document.getElementById('submit-icon');
+        const deployButton = document.getElementById('deploy-button');
+        const resetButton = document.getElementById('reset-button');
+        const messageDisplay = document.getElementById('message-display');
+        const journeyIdDisplay = document.getElementById('journey-id-display');
+        const journeyIdValue = document.getElementById('journey-id-value');
+        const mainStatusIcon = document.getElementById('main-status-icon');
+        const apiModeLabel = document.getElementById('api-mode-label');
+        const toggleApiButton = document.getElementById('toggle-api-button');
+        const toggleIconRight = document.getElementById('toggle-icon-right');
+        const toggleIconLeft = document.getElementById('toggle-icon-left');
+        const configToggleContainer = document.getElementById('config-toggle-container');
+        const footerMessage = document.getElementById('footer-message');
+
+        // State Management
+        let status = 'IDLE'; // 'IDLE', 'SUBMITTING', 'POLLING', 'SUCCESS', 'FAILURE', 'DEPLOYING', 'DEPLOY_SUCCESS', 'DEPLOY_FAILURE'
+        let journeyId = null;
+        let pollCount = 0;
+        let pollingTimer = null;
+        let useMockApi = true; // Flag for mock/real API
+
+        // Icon SVGs (using same viewBox/stroke values as Lucide)
+        const ICON = {
+            SEND: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`,
+            LOADER: (color) => `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-16 h-16 ${color} animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`,
+            CHECK: (color) => `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-16 h-16 ${color}"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`,
+            X: (color) => `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-16 h-16 ${color}"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>`,
+            TERMINAL: (color) => `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-16 h-16 ${color}"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>`,
+        };
+
+        // --- Mock API Implementations ---
+
+        const mockSubmitApi = (query) => new Promise((resolve, reject) => {
+            setTimeout(() => {
+                if (!query || query.trim() === '') {
+                    reject(new Error('Query cannot be empty.'));
+                }
+                resolve({
+                    journeyId: `JRN-${Math.floor(Math.random() * 90000) + 10000}`,
+                    message: 'Initial request accepted. Starting background job.',
+                });
+            }, 1500);
+        });
+
+        const mockStatusApi = (id, attempt) => new Promise(resolve => {
+            const POLLING_INTERVAL = 1500;
+            setTimeout(() => {
+                let currentStatus, details;
+                
+                // Simulate success after 4 polls
+                if (attempt >= 4) {
+                    currentStatus = 'SUCCESS';
+                    details = 'Job completed successfully. Ready for deployment.';
+                } 
+                // Simulate failure path occasionally
+                else if (attempt === 2 && Math.random() < 0.1) {
+                    currentStatus = 'FAILURE';
+                    details = 'Job failed due to a mock resource error.';
+                } 
+                // Still running
+                else {
+                    currentStatus = 'POLLING';
+                    details = `Processing in progress... (Poll ${attempt}/4)`;
+                }
+
+                resolve({ status: currentStatus, details });
+            }, POLLING_INTERVAL);
+        });
+
+        const mockDeployApi = (id) => new Promise((resolve, reject) => {
+            setTimeout(() => {
+                // 1 in 5 chance of deployment failure simulation
+                if (Math.random() < 0.2) {
+                    reject({ status: 500, message: 'Deployment failed: Infrastructure error.' });
+                } else {
+                    resolve({ status: 200, message: 'Journey is deployed successfully' });
+                }
+            }, 1500);
+        });
+
+        // --- Real API Placeholders ---
+
+        const realSubmitApi = async (query) => {
+            console.log(`Making REAL API SUBMIT call to: ${REAL_API_URLS.SUBMIT}`);
+            await new Promise(r => setTimeout(r, 500)); 
+            throw new Error(`Real API endpoint not accessible: ${REAL_API_URLS.SUBMIT}`);
+        };
+
+        const realStatusApi = async (id, attempt) => {
+            console.log(`Making REAL API STATUS call to: ${REAL_API_URLS.STATUS}/${id}`);
+            await new Promise(r => setTimeout(r, 500));
+            throw new Error('Real API not accessible. Check network configuration.');
+        };
+
+        const realDeployApi = async (id) => {
+            console.log(`Making REAL API DEPLOY call to: ${REAL_API_URLS.DEPLOY}/${id}`);
+            await new Promise(r => setTimeout(r, 500));
+            throw new Error('Real API not accessible. Check network configuration.');
+        };
+
+        // --- Core Logic ---
+
+        const updateUI = () => {
+            // State checks
+            const isIdle = status === 'IDLE';
+            const isSubmittingOrRunning = status === 'SUBMITTING' || status === 'POLLING' || status === 'DEPLOYING';
+            const isDeployReady = status === 'SUCCESS';
+            const isSuccess = status === 'DEPLOY_SUCCESS';
+            const isFailure = status.includes('FAILURE');
+            const showReset = isFailure || isSuccess;
+
+            // --- Input and Submit Button ---
+            queryInput.disabled = isSubmittingOrRunning || isSuccess;
+            submitButton.disabled = isSubmittingOrRunning || isSuccess || queryInput.value.trim() === '';
+            queryInput.placeholder = isSubmittingOrRunning ? "Job running, input disabled..." : "Type your query here...";
+
+            // Update submit button icon
+            if (isSubmittingOrRunning) {
+                submitIcon.innerHTML = ICON.LOADER('w-5 h-5 animate-spin text-primary-gold').replace(/w-16 h-16/g, 'w-5 h-5');
+            } else {
+                submitIcon.innerHTML = ICON.SEND;
+            }
+
+            // --- Deploy and Reset Buttons ---
+            deployButton.classList.toggle('hidden', !isDeployReady);
+            deployButton.disabled = status === 'DEPLOYING';
+            resetButton.classList.toggle('hidden', !showReset);
+
+            // --- Status Display ---
+            journeyIdDisplay.classList.toggle('hidden', !journeyId);
+            if (journeyId) {
+                journeyIdValue.textContent = journeyId;
+            }
+
+            let colorClass = 'text-gray-400';
+            mainStatusIcon.innerHTML = '';
+
+            if (isSuccess) {
+                colorClass = 'text-primary-green font-semibold';
+                mainStatusIcon.innerHTML = ICON.CHECK('text-primary-green');
+            } else if (isFailure) {
+                colorClass = 'text-red-500 font-semibold';
+                mainStatusIcon.innerHTML = ICON.X('text-red-500');
+            } else if (isDeployReady) {
+                colorClass = 'text-primary-blue';
+                mainStatusIcon.innerHTML = ICON.TERMINAL('text-primary-blue');
+            } else if (isSubmittingOrRunning) {
+                colorClass = 'text-primary-gold';
+                mainStatusIcon.innerHTML = ICON.LOADER('text-primary-gold');
+            }
+
+            messageDisplay.className = `text-lg transition-colors duration-500 ${colorClass}`;
+            messageDisplay.textContent = messageDisplay.textContent; // Trigger re-render of content
+            
+            // --- API Mode Toggle Appearance ---
+            configToggleContainer.classList.remove('bg-amber-900/30', 'border-amber-500/50', 'bg-blue-900/30', 'border-blue-500/50');
+            if (useMockApi) {
+                apiModeLabel.textContent = 'Mock API Mode';
+                footerMessage.textContent = 'Using mock API calls for demonstration.';
+                configToggleContainer.classList.add('bg-amber-900/30', 'border-amber-500/50');
+                toggleIconRight.classList.remove('hidden');
+                toggleIconLeft.classList.add('hidden');
+            } else {
+                apiModeLabel.textContent = 'Real API Mode (Simulated Errors)';
+                footerMessage.textContent = 'Attempting real API calls (Simulated errors).';
+                configToggleContainer.classList.add('bg-blue-900/30', 'border-blue-500/50');
+                toggleIconRight.classList.add('hidden');
+                toggleIconLeft.classList.remove('hidden');
+            }
+            // Disable toggle button if a process is active
+            toggleApiButton.disabled = isSubmittingOrRunning && !showReset;
+            toggleApiButton.classList.toggle('opacity-50', toggleApiButton.disabled);
+        };
+
+        const updateState = (newStatus, newMessage, newJourneyId = journeyId) => {
+            status = newStatus;
+            messageDisplay.textContent = newMessage;
+            journeyId = newJourneyId;
+            updateUI();
+        };
+        
+        // --- Asynchronous Logic ---
+
+        const getSubmitApi = () => useMockApi ? mockSubmitApi : realSubmitApi;
+        const getStatusApi = () => useMockApi ? mockStatusApi : realStatusApi;
+        const getDeployApi = () => useMockApi ? mockDeployApi : realDeployApi;
+
+
+        const pollStatus = async () => {
+            if (status !== 'POLLING' || !journeyId) {
+                return;
+            }
+
+            clearTimeout(pollingTimer);
+            pollCount++;
+            
+            const statusApi = getStatusApi();
+            
+            try {
+                const { status: newStatus, details } = await statusApi(journeyId, pollCount); 
+
+                if (newStatus === 'SUCCESS') {
+                    updateState('SUCCESS', 'Job complete! Review the result and proceed to deployment.');
+                } else if (newStatus === 'FAILURE') {
+                    updateState('FAILURE', `Job failed: ${details}. Please try a different query.`);
+                } else {
+                    updateState('POLLING', `Status: ${details}. Hang tight—sip coffee, sit back, and relax.`);
+                    // Continue polling
+                    const interval = useMockApi ? 1500 : 2000;
+                    pollingTimer = setTimeout(pollStatus, interval); 
+                }
+
+            } catch (error) {
+                updateState('FAILURE', `An API error occurred during polling: ${error.message}`);
+            }
+        };
+
+        // --- Event Handlers ---
+
+        const handleReset = () => {
+            clearTimeout(pollingTimer);
+            queryInput.value = '';
+            pollCount = 0;
+            updateState('IDLE', 'Enter your prompt to start the journey.', null);
+        };
+
+        const handleDeploy = async () => {
+            if (status !== 'SUCCESS' || !journeyId) return;
+
+            updateState('DEPLOYING', 'Deploying your journey...');
+
+            try {
+                const deployApi = getDeployApi();
+                const { status: deployStatus, message: deployMsg } = await deployApi(journeyId);
+                
+                if (deployStatus === 200) {
+                    updateState('DEPLOY_SUCCESS', `${deployMsg} with journey ID: ${journeyId}`);
+                } else {
+                    updateState('DEPLOY_FAILURE', `Deployment failed (HTTP ${deployStatus || 'Unknown'}): ${deployMsg}`);
+                }
+            
+            } catch (error) {
+                updateState('DEPLOY_FAILURE', `Deployment failed (HTTP Error): ${error.message}.`);
+            }
+        };
+
+        const handleSubmit = async (e) => {
+            e.preventDefault();
+            if (status !== 'IDLE' && status !== 'FAILURE') return;
+
+            const trimmedQuery = queryInput.value.trim();
+            if (!trimmedQuery) {
+                updateState('IDLE', 'Please enter a query before submitting.');
+                return;
+            }
+
+            // Reset necessary state and UI elements
+            handleReset(); 
+            queryInput.value = trimmedQuery; // Preserve entered query visually for context
+            updateState('SUBMITTING', 'Submitting query...');
+
+            try {
+                const submitApi = getSubmitApi();
+                const { journeyId: newId, message: submitMsg } = await submitApi(trimmedQuery);
+                
+                updateState('POLLING', submitMsg + ' Now polling for status...', newId);
+                // First poll is triggered by the pollStatus check inside the main event loop (or immediate call if needed)
+
+            } catch (error) {
+                updateState('FAILURE', `Submission failed: ${error.message}`);
+            }
+        };
+        
+        const handleApiToggle = () => {
+            if (status === 'IDLE' || status === 'FAILURE' || status === 'DEPLOY_SUCCESS' || status === 'DEPLOY_FAILURE') {
+                useMockApi = !useMockApi;
+                handleReset(); // Reset flow when switching mode
+            } else {
+                updateState(status, 'Cannot switch API mode while a job is running. Reset first.');
+            }
+        };
+
+        // --- Initialization and Event Listeners ---
+        window.onload = function() {
+            updateUI(); // Initial render of UI state
+            document.getElementById('query-form').addEventListener('submit', handleSubmit);
+            deployButton.addEventListener('click', handleDeploy);
+            resetButton.addEventListener('click', handleReset);
+            toggleApiButton.addEventListener('click', handleApiToggle);
+
+            // Optional: Listen to input changes to enable submit button
+            queryInput.addEventListener('input', updateUI);
+        };
+    </script>
+</body>
+</html>
