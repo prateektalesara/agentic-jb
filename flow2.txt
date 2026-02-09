@@ -1,0 +1,58 @@
+flowchart TD
+    %% Styling for better readability
+    classDef internal fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
+    classDef external fill:#fff3e0,stroke:#e65100,stroke-width:2px,stroke-dasharray: 5 5;
+    classDef database fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef eventbus fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
+
+    %% --- External Actors ---
+    Client([Client / Onboarding UI]):::external
+    Ext_TMX["External TMX API"]:::external
+    Ext_SIRA["External SIRA (SOAP)"]:::external
+    Ext_CRM["External CRM System"]:::external
+
+    %% --- The Internal System ---
+    subgraph "Fraud Check Ecosystem"
+        direction TB
+
+        %% Components
+        API["Enquiry Service<br/>(API & DB Owner)"]:::internal
+        DB[("Enquiry DB")]:::database
+        
+        Kafka{{"Kafka Event Bus"}}:::eventbus
+        
+        Proc["Enquiry Processor<br/>(Orchestrator)"]:::internal
+        
+        TMX_Adp["TMX Adapter<br/>(REST Wrapper)"]:::internal
+        SIRA_Adp["SIRA Adapter<br/>(REST Wrapper)"]:::internal
+        
+        Case_W["Case Processor<br/>(Worker)"]:::internal
+    end
+
+    %% --- Flows ---
+
+    %% 1. Ingestion Flow
+    Client -->|1. POST /enquire| API
+    API <-->|Persist State| DB
+    API -.->|2. Pub: EnquiryCreated| Kafka
+
+    %% 2. Processing Flow
+    Kafka -.->|3. Sub: EnquiryCreated| Proc
+    Proc -->|4. Enrich REST| TMX_Adp
+    TMX_Adp <-->|HTTPS| Ext_TMX
+    
+    Proc -->|5. Decision REST| SIRA_Adp
+    SIRA_Adp <-->|SOAP/XML| Ext_SIRA
+
+    %% 3. Decision Fan-Out
+    Proc -.->|"6a. Pub: ENQUIRY_UPDATE<br/>(Cleared/Decline/Refer)"| Kafka
+    Proc -.->|"6b. Pub: CASE_REFERRED<br/>(If Referred)"| Kafka
+
+    %% 4. Handling Updates & Case Creation
+    Kafka -.->|7. Sub: ENQUIRY_UPDATE| API
+    Kafka -.->|8. Sub: CASE_REFERRED| Case_W
+    
+    Case_W -->|9. Create Case| Ext_CRM
+
+    %% 5. Closing the Loop
+    Ext_CRM -.->|"10. Webhook: Case Update"| API
