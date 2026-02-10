@@ -6,10 +6,12 @@ sequenceDiagram
     participant TMX_Adp as TMX Adapter<br/>[REST Wrapper]
     participant SIRA_Adp as SIRA Adapter<br/>[REST Wrapper]
     participant Case_W as Case Processor<br/>[Worker]
+    participant Notif_W as Notification Worker<br/>[Worker]
     participant Ext_CRM as External CRM
+    
 
     Note over Client, API: Phase 1: Ingestion
-    Client->>API: POST /enquire
+    Client->>API: POST /enquire (callbackUrl)
     API->>API: Save to DB (Status: RECEIVED)
     API--)Proc: Event: EnquiryCreatedEvent
     API-->>Client: 202 Accepted
@@ -24,10 +26,15 @@ sequenceDiagram
     SIRA_Adp->>SIRA_Adp: SOAP Call to External SIRA
     SIRA_Adp-->>Proc: Decision (CLEARED / DECLINE / REFERRED)
 
-    Note over Proc, API: Phase 3: Decision Handling
+    Note over Proc, Notif_W: Phase 3: Decision Handling & Fan-Out
     alt Decision is CLEARED or DECLINE
-        Proc--)API: Event: ENQUIRY_UPDATE_EVENT
-        API->>API: Update DB (Status: CLEARED/DECLINE)
+        par Update DB
+            Proc--)API: Event: ENQUIRY_UPDATE_EVENT
+            API->>API: Update DB (Status: CLEARED/DECLINE)
+        and Notify Client (Webhook)
+            Proc--)Notif_W: Event: ENQUIRY_UPDATE_EVENT
+            Notif_W->>Client: POST Webhook (Decision)
+        end
     
     else Decision is REFERRED
         par Update Enquiry Status
@@ -35,6 +42,9 @@ sequenceDiagram
             API->>API: Update DB (Status: REFERRED)
         and Trigger Case Creation
             Proc--)Case_W: Event: CASE_REFERRED_EVENT
+        and Notify Client (Webhook)
+            Proc--)Notif_W: Event: ENQUIRY_UPDATE_EVENT
+            Notif_W->>Client: POST Webhook (Decision: REFER)
         end
     end
 

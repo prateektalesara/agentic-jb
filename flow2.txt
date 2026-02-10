@@ -27,6 +27,7 @@ flowchart TD
         SIRA_Adp["SIRA Adapter<br/>(REST Wrapper)"]:::internal
         
         Case_W["Case Processor<br/>(Worker)"]:::internal
+        Notif_W["Notification Worker<br/>(Webhook Sender)"]:::internal
     end
 
     %% --- Flows ---
@@ -49,10 +50,12 @@ flowchart TD
     Proc -.->|"6b. Pub: CASE_REFERRED<br/>(If Referred)"| Kafka
 
     %% 4. Handling Updates & Case Creation
-    Kafka -.->|7. Sub: ENQUIRY_UPDATE| API
+    Kafka -.->|7a. Sub: ENQUIRY_UPDATE| API
+    Kafka -.->|7b. Sub: ENQUIRY_UPDATE| Notif_W
     Kafka -.->|8. Sub: CASE_REFERRED| Case_W
     
     Case_W -->|9. Create Case| Ext_CRM
 
-    %% 5. Closing the Loop
-    Ext_CRM -.->|"10. Webhook: Case Update"| API
+    %% 5. Notification & Loop Closing
+    Notif_W -->|"10. Webhook: Final Decision"| Client
+    Ext_CRM -.->|"11. Webhook: Case Update"| API
