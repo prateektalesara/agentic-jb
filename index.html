@@ -1,467 +1,1208 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LLM Workflow Starter</title>
-    <!-- Load Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Milestones: The 10th Birthday</title>
     <style>
-        /* Custom spinner animation color */
-        .spinner-color {
-            border-top-color: #F59E0B; /* Tailwind amber-400 */
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #2c3e50;
+            font-family: 'Nunito', sans-serif;
+            touch-action: none;
+            /* Prevent pull-to-refresh on mobile */
+            user-select: none;
+            -webkit-user-select: none;
         }
-    </style>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'primary-blue': '#3B82F6',   /* Used for icons/accents */
-                        'primary-green': '#10B981',  /* Used for success/deploy button */
-                        'primary-gold': '#F59E0B',   /* Used for loading/polling */
-                        'slate-900': '#0F172A',
-                        'slate-800': '#1E293B',
-                        'slate-700': '#334155',
-                    }
-                }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100vh;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* HUD */
+        #hud {
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            color: white;
+            text-shadow: 2px 2px 0 #000;
+            font-family: 'Fredoka One', cursive;
+            font-size: 24px;
+            pointer-events: none;
+        }
+
+        /* Screens (Start, Game Over, etc) */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            pointer-events: auto;
+            z-index: 10;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        h1 {
+            font-family: 'Fredoka One', cursive;
+            font-size: 48px;
+            margin-bottom: 10px;
+            color: #FFD700;
+            text-shadow: 3px 3px 0 #d35400;
+            text-align: center;
+            width: 100%;
+        }
+
+        p {
+            font-size: 18px;
+            max-width: 600px;
+            text-align: center;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 24px;
+            font-family: 'Fredoka One', cursive;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #c0392b;
+            transition: transform 0.1s;
+        }
+
+        .btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #c0392b;
+        }
+
+        /* Mobile Controls */
+        #controls {
+            display: none;
+            /* Shown via JS on touch devices */
+            width: 100%;
+            padding: 20px 40px;
+            box-sizing: border-box;
+            justify-content: space-between;
+            align-items: flex-end;
+            pointer-events: auto;
+            padding-bottom: 30px;
+        }
+
+        .control-btn {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 30px;
+            user-select: none;
+            backdrop-filter: blur(4px);
+            touch-action: none;
+        }
+
+        .control-btn:active {
+            background: rgba(255, 255, 255, 0.4);
+            transform: scale(0.95);
+        }
+
+        .d-pad {
+            display: flex;
+            gap: 20px;
+        }
+
+        /* Landscape Enforcement Screen */
+        #rotate-message {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #2c3e50;
+            z-index: 100;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+
+        #rotate-icon {
+            font-size: 60px;
+            margin-bottom: 20px;
+            animation: rotatePhone 2s infinite;
+        }
+
+        @keyframes rotatePhone {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            50% {
+                transform: rotate(-90deg);
+            }
+
+            100% {
+                transform: rotate(-90deg);
             }
         }
-    </script>
+
+        /* Media Query for Portrait Mobile */
+        @media screen and (orientation: portrait) and (max-width: 900px) {
+            #rotate-message {
+                display: flex;
+            }
+
+            #ui-layer,
+            #gameCanvas,
+            .screen {
+                visibility: hidden;
+            }
+        }
+
+        /* Final Message styling */
+        #final-message {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: white;
+            font-family: 'Fredoka One', cursive;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 2s;
+            z-index: 20;
+        }
+
+        @keyframes bounceGift {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.1);
+            }
+        }
+
+        #gift-container {
+            cursor: pointer;
+            margin: 20px 0;
+            transition: transform 0.2s;
+            pointer-events: auto;
+        }
+
+        #gift-container:hover {
+            transform: scale(1.05);
+        }
+
+        #gift-box {
+            font-size: 100px;
+            animation: bounceGift 1.5s infinite;
+            filter: drop-shadow(0 0 10px gold);
+        }
+
+        #click-hint {
+            font-size: 24px;
+            color: #ffeaa7;
+            animation: blink 1s infinite alternate;
+        }
+
+        @keyframes blink {
+            from {
+                opacity: 0.5;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        #surprise-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            from {
+                transform: scale(0);
+                opacity: 0;
+            }
+
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        #surprise-text {
+            color: #FFD700;
+            font-size: 40px;
+            text-shadow: 2px 2px #e91e63;
+            margin: 20px 0;
+            line-height: 1.2;
+        }
+
+        #doll-house-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            filter: drop-shadow(0 0 15px #e91e63);
+        }
+    </style>
 </head>
-<body class="bg-slate-900 text-white min-h-screen flex items-center justify-center font-sans p-4">
 
-    <div id="app" class="w-full max-w-2xl flex flex-col">
+<body>
 
-        <!-- Header/Title Area -->
-        <div class="text-center mb-10 mt-10">
-            <h1 class="text-4xl font-bold tracking-tight text-gray-100 flex items-center justify-center">
-                <!-- Lucide-style Terminal icon -->
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-8 h-8 mr-3 text-primary-blue">
-                    <polyline points="4 17 10 11 4 5"></polyline>
-                    <line x1="12" y1="19" x2="20" y2="19"></line>
-                </svg>
-                LLM Workflow Starter
-            </h1>
-            <p class="text-gray-400 mt-2">Simulate an asynchronous job and deployment pipeline.</p>
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Rotate Prompt -->
+    <div id="rotate-message">
+        <div id="rotate-icon">📱</div>
+        <h1>Please Rotate Device</h1>
+        <p>This game is designed to be played in Landscape mode.</p>
+    </div>
+
+    <div id="ui-layer">
+        <div id="hud">
+            <div id="level-display">Age: 1</div>
+            <div id="score-display">Memories: 0/3</div>
         </div>
 
-        <!-- Configuration Toggle -->
-        <div class="flex justify-end mb-4">
-            <div id="config-toggle-container" class="flex items-center p-2 rounded-lg transition-colors duration-300">
-                <!-- Lucide-style Settings icon -->
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 mr-2 text-gray-400">
-                    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.44a2 2 0 0 0-2 2h-.44a2 2 0 0 0-2 2v.44a2 2 0 0 0-2 2v.44a2 2 0 0 0 2 2h.44a2 2 0 0 0 2 2v.44a2 2 0 0 0 2 2h.44a2 2 0 0 0 2 2v.44a2 2 0 0 0 2 2h.44a2 2 0 0 0 2 2v-.44a2 2 0 0 0 2 2h.44a2 2 0 0 0 2 2v-.44a2 2 0 0 0 2-2v-.44a2 2 0 0 0 2-2v-.44a2 2 0 0 0 2-2v-.44a2 2 0 0 0-2-2h-.44a2 2 0 0 0-2-2v-.44a2 2 0 0 0-2-2h-.44a2 2 0 0 0-2-2v-.44a2 2 0 0 0-2-2z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                </svg>
-                <span id="api-mode-label" class="text-sm font-medium text-gray-200 mr-3">Mock API Mode</span>
-                
-                <button id="toggle-api-button" class="p-1 rounded-full transition-transform duration-300 focus:outline-none focus:ring-2 focus:ring-primary-blue" title="Toggle Mock/Real API">
-                    <!-- Lucide-style Toggle Right (Initial Mock state) -->
-                    <svg id="toggle-icon-right" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-7 h-7 text-primary-gold">
-                        <rect width="20" height="12" x="2" y="6" rx="6"></rect>
-                        <circle cx="18" cy="12" r="3"></circle>
-                    </svg>
-                    <!-- Lucide-style Toggle Left (Real API state - initially hidden) -->
-                    <svg id="toggle-icon-left" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-7 h-7 text-primary-blue hidden">
-                        <rect width="20" height="12" x="2" y="6" rx="6"></rect>
-                        <circle cx="6" cy="12" r="3"></circle>
-                    </svg>
-                </button>
-            </div>
-        </div>
+        <div id="final-message">
+            <h1 id="bday-header" style="color: #fff; font-size: 48px; margin-bottom: 10px;">Happy 10th Birthday Sakina
+                !!!</h1>
 
-        <!-- Central Content Area (Deploy Button or Polling Status) -->
-        <div class="flex-grow flex flex-col items-center justify-center p-6 bg-slate-800 rounded-xl shadow-2xl transition-all duration-500">
-          
-            <!-- Main Status Indicator -->
-            <div class="mb-8 text-center">
-                <div id="main-status-icon" class="w-16 h-16 mx-auto mb-4">
-                    <!-- Icon placeholder -->
-                </div>
-                
-                <p id="message-display" class="text-lg transition-colors duration-500 text-gray-400">Enter your prompt to start the journey.</p>
-                <p id="journey-id-display" class="text-sm text-gray-500 mt-2 hidden">
-                    Journey ID: <span id="journey-id-value" class="font-mono text-primary-blue"></span>
-                </p>
+            <!-- Gift Section -->
+            <div id="gift-container" onclick="openGift()">
+                <div id="gift-box">🎁</div>
+                <div id="click-hint">Click to Open Gift!</div>
             </div>
 
-            <!-- Deployment Button -->
-            <button id="deploy-button" disabled class="mt-6 px-10 py-4 text-xl font-bold rounded-full bg-primary-green hover:bg-emerald-700 text-white shadow-lg transition-all duration-300 transform hover:scale-105 disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center hidden">
-                <span id="deploy-button-text" class="flex items-center">
-                    <!-- Lucide-style Check Circle icon -->
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 mr-2">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                    </svg>
-                    Deploy Button
-                </span>
-            </button>
+            <!-- Surprise Reveal Section -->
+            <div id="surprise-container" class="hidden">
+                <div id="doll-house-icon">🏰</div>
+                <div id="surprise-text">Surprise Sakina you unlocked a doll house !!!</div>
+            </div>
 
-            <!-- Reset Button -->
-            <button id="reset-button" class="mt-8 px-6 py-2 text-sm font-semibold rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-700 transition duration-200 flex items-center hidden">
-                <!-- Lucide-style Refresh Cw icon -->
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 mr-2">
-                    <path d="M23 4v6h-6"></path>
-                    <path d="M1 20v-6h6"></path>
-                    <path d="M3.5 9a9 9 0 0 1 17 0"></path>
-                    <path d="M20.5 15a9 9 0 0 1-17 0"></path>
-                </svg>
-                Start New Journey
-            </button>
-
+            <!-- Family Quote -->
+            <p id="family-quote" class="hidden" style="font-size: 24px; color: #ffeaa7; margin-top: 20px;">"We will
+                always be there for your every milestone."</p>
         </div>
 
-        <!-- Input Form at the Bottom (ChatGPT Style) -->
-        <div class="mt-8 mb-4">
-            <form id="query-form" class="relative">
-                <input
-                    type="text"
-                    id="query-input"
-                    placeholder="Type your query here..."
-                    class="w-full p-4 pr-12 text-lg bg-slate-700 text-gray-200 border border-slate-600 rounded-xl focus:ring-2 focus:ring-primary-blue focus:border-primary-blue outline-none transition-shadow duration-300 shadow-xl disabled:opacity-70 disabled:cursor-not-allowed"
-                />
-                <button
-                    type="submit"
-                    id="submit-button"
-                    class="absolute right-3 top-1/2 transform -translate-y-1/2 p-2 rounded-lg text-primary-blue hover:bg-slate-600 disabled:text-gray-500 disabled:hover:bg-transparent transition"
-                    aria-label="Submit Query"
-                >
-                    <!-- Lucide-style Send icon -->
-                    <svg id="submit-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
-                        <line x1="22" y1="2" x2="11" y2="13"></line>
-                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                    </svg>
-                </button>
-            </form>
-        </div>
-
-        <!-- Footer / Status Bar -->
-        <div class="text-xs text-gray-500 mt-4 flex items-center justify-center">
-            <span id="footer-message" class='mr-4'>Using mock API calls for demonstration.</span>
-            <!-- Wizard Logo SVG (Inline) -->
-            <svg width="24" height="24" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M400 240 L400 512 L112 512 L112 240 C112 120 400 120 400 240 Z" fill="#3B82F6"/>
-                <path d="M420 180 L350 100 L256 0 L162 100 L92 180 L420 180 Z" fill="#3B82F6"/>
-                <circle cx="256" cy="280" r="80" fill="#F3F4F6"/>
-                <path d="M256 200 C300 200 300 280 256 280 C212 280 212 200 256 200 Z" fill="#F3F4F6"/>
-                <rect x="200" y="300" width="112" height="30" rx="6" fill="#10B981"/>
-                <path d="M256 340 L286 370 L256 400 L226 370 Z" fill="#F59E0B"/>
-                <rect x="140" y="440" width="80" height="30" rx="6" fill="#3B82F6"/>
-                <rect x="292" y="440" width="80" height="30" rx="6" fill="#3B82F6"/>
-                <line x1="256" y1="330" x2="256" y2="340" stroke="#4B5563" stroke-width="4"/>
-                <line x1="256" y1="400" x2="256" y2="440" stroke="#4B5563" stroke-width="4"/>
-                <line x1="256" y1="440" x2="292" y2="440" stroke="#4B5563" stroke-width="4"/>
-                <line x1="256" y1="440" x2="220" y2="440" stroke="#4B5563" stroke-width="4"/>
-                <polygon points="400,200 408,210 420,210 412,220 415,232 400,225 385,232 388,220 380,210 392,210" fill="#F59E0B" transform="translate(10, -50) scale(1.5)"/>
-            </svg>
+        <div id="controls">
+            <div class="d-pad">
+                <div class="control-btn" id="btn-left">←</div>
+                <div class="control-btn" id="btn-right">→</div>
+            </div>
+            <div class="control-btn" id="btn-flap" style="width: 100px; border-radius: 30px;">FLAP</div>
         </div>
     </div>
 
+    <!-- START SCREEN -->
+    <div id="start-screen" class="screen">
+        <h1>MILESTONES</h1>
+        <p>Help her fly through the years. Collect memories (stars) to grow up.<br>Tap FLAP to fly. Avoid the obstacles!
+        </p>
+        <button class="btn" id="start-btn">Start Journey</button>
+    </div>
+
+    <!-- LEVEL COMPLETE SCREEN -->
+    <div id="level-screen" class="screen hidden">
+        <h1 id="level-title">Age 1 Complete!</h1>
+        <p>Ready for the next year?</p>
+        <button class="btn" id="next-level-btn">Grow Up</button>
+    </div>
+
+    <!-- GAME OVER SCREEN -->
+    <div id="game-over-screen" class="screen hidden">
+        <h1>Ouch!</h1>
+        <p>Don't worry, we can always try again.</p>
+        <button class="btn" id="retry-btn">Try Again</button>
+    </div>
+
     <script>
-        // --- CONFIGURATION ---
-        const REAL_API_URLS = {
-            SUBMIT: '/api/v1/submit-query',
-            STATUS: '/api/v1/poll-status',
-            DEPLOY: '/api/v1/deploy-journey',
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- CUSTOM PHOTOS CONFIGURATION ---
+        const girlImg = new Image();
+        girlImg.crossOrigin = "Anonymous";
+        girlImg.src = 'https://raw.githubusercontent.com/prateektalesara/mcq-engine/refs/heads/game/sk-i.png';
+
+        const momImg = new Image();
+        momImg.crossOrigin = "Anonymous";
+        momImg.src = 'https://raw.githubusercontent.com/prateektalesara/mcq-engine/refs/heads/game/mom-i.png';
+
+        const dadImg = new Image();
+        dadImg.crossOrigin = "Anonymous";
+        dadImg.src = 'https://raw.githubusercontent.com/prateektalesara/mcq-engine/refs/heads/game/dad-i.png';
+        // ------------------------------------
+
+        // Screens & UI
+        const startScreen = document.getElementById('start-screen');
+        const levelScreen = document.getElementById('level-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const levelTitle = document.getElementById('level-title');
+        const hudLevel = document.getElementById('level-display');
+        const hudScore = document.getElementById('score-display');
+        const controls = document.getElementById('controls');
+        const finalMessage = document.getElementById('final-message');
+        const giftContainer = document.getElementById('gift-container');
+        const surpriseContainer = document.getElementById('surprise-container');
+        const familyQuote = document.getElementById('family-quote');
+
+        // Game State
+        let gameState = 'START';
+        let level = 1;
+        let maxLevels = 10; // Default to 10 levels
+        let frames = 0;
+        let animationFrameId;
+
+        // Time management
+        let lastTime = 0;
+        let fireworkInterval = null;
+
+        // Physics
+        const GRAVITY = 0.28;
+        const FLAP_FORCE = -8.0;
+        const MOVE_SPEED = 0.4;
+        const MAX_H_SPEED = 6;
+        const FRICTION = 0.96;
+
+        // Input
+        const keys = {
+            ArrowLeft: false,
+            ArrowRight: false,
+            Space: false,
+            ArrowUp: false
         };
 
-        // UI Element References
-        const queryInput = document.getElementById('query-input');
-        const submitButton = document.getElementById('submit-button');
-        const submitIcon = document.getElementById('submit-icon');
-        const deployButton = document.getElementById('deploy-button');
-        const resetButton = document.getElementById('reset-button');
-        const messageDisplay = document.getElementById('message-display');
-        const journeyIdDisplay = document.getElementById('journey-id-display');
-        const journeyIdValue = document.getElementById('journey-id-value');
-        const mainStatusIcon = document.getElementById('main-status-icon');
-        const apiModeLabel = document.getElementById('api-mode-label');
-        const toggleApiButton = document.getElementById('toggle-api-button');
-        const toggleIconRight = document.getElementById('toggle-icon-right');
-        const toggleIconLeft = document.getElementById('toggle-icon-left');
-        const configToggleContainer = document.getElementById('config-toggle-container');
-        const footerMessage = document.getElementById('footer-message');
+        // Entities
+        let player;
+        let obstacles = [];
+        let collectibles = [];
+        let particles = [];
+        let portal;
+        let parents = [];
+        let cake;
 
-        // State Management
-        let status = 'IDLE'; // 'IDLE', 'SUBMITTING', 'POLLING', 'SUCCESS', 'FAILURE', 'DEPLOYING', 'DEPLOY_SUCCESS', 'DEPLOY_FAILURE'
-        let journeyId = null;
-        let pollCount = 0;
-        let pollingTimer = null;
-        let useMockApi = true; // Flag for mock/real API
+        // Colors
+        const levelColors = [
+            '#87CEEB', '#AED581', '#4DB6AC', '#FFF176', '#FFB74D',
+            '#F06292', '#BA68C8', '#7986CB', '#4FC3F7', '#2c3e50'
+        ];
 
-        // Icon SVGs (using same viewBox/stroke values as Lucide)
-        const ICON = {
-            SEND: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`,
-            LOADER: (color) => `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-16 h-16 ${color} animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`,
-            CHECK: (color) => `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-16 h-16 ${color}"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`,
-            X: (color) => `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-16 h-16 ${color}"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>`,
-            TERMINAL: (color) => `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-16 h-16 ${color}"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>`,
-        };
-
-        // --- Mock API Implementations ---
-
-        const mockSubmitApi = (query) => new Promise((resolve, reject) => {
-            setTimeout(() => {
-                if (!query || query.trim() === '') {
-                    reject(new Error('Query cannot be empty.'));
+        // Resize
+        function resize() {
+            if (Math.abs(canvas.width - window.innerWidth) > 10 || Math.abs(canvas.height - window.innerHeight) > 10) {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+                    controls.style.display = 'flex';
                 }
-                resolve({
-                    journeyId: `JRN-${Math.floor(Math.random() * 90000) + 10000}`,
-                    message: 'Initial request accepted. Starting background job.',
-                });
-            }, 1500);
+                if (gameState !== 'START') draw();
+            }
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // ------------------ CLASSES ------------------
+
+        class Player {
+            constructor() {
+                this.x = 100;
+                this.y = canvas.height - 150;
+                this.vx = 0;
+                this.vy = 0;
+                this.radius = 15;
+                this.width = 30;
+                this.height = 40;
+                this.facingRight = true;
+                this.balloons = 2;
+                this.flapCooldown = 0;
+            }
+
+            update(dt) {
+                if (gameState === 'CUTSCENE' || gameState === 'ENDED') {
+                    this.cutsceneBehavior(dt);
+                    return;
+                }
+
+                // Physics
+                this.vy += GRAVITY * dt;
+                this.vx *= Math.pow(FRICTION, dt);
+                this.x += this.vx * dt;
+                this.y += this.vy * dt;
+
+                // Inputs
+                if (keys.ArrowRight) {
+                    this.vx += MOVE_SPEED * dt;
+                    this.facingRight = true;
+                }
+                if (keys.ArrowLeft) {
+                    this.vx -= MOVE_SPEED * dt;
+                    this.facingRight = false;
+                }
+
+                if (this.vx > MAX_H_SPEED) this.vx = MAX_H_SPEED;
+                if (this.vx < -MAX_H_SPEED) this.vx = -MAX_H_SPEED;
+
+                if (this.y + this.height / 2 > canvas.height - 20) {
+                    this.y = canvas.height - 20 - this.height / 2;
+                    this.vy = 0;
+                }
+                if (this.y < 0) {
+                    this.y = 0;
+                    this.vy = 0;
+                }
+                if (this.x > canvas.width) this.x = 0;
+                if (this.x < 0) this.x = canvas.width;
+
+                if (this.flapCooldown > 0) this.flapCooldown -= 1 * dt;
+            }
+
+            flap() {
+                this.vy = FLAP_FORCE;
+                createParticles(this.x, this.y + 20, 3, '#fff');
+            }
+
+            cutsceneBehavior(dt) {
+                this.vy += GRAVITY * dt;
+                this.vx *= 0.8;
+                this.y += this.vy * dt;
+                this.x += this.vx * dt;
+
+                if (this.y + this.height / 2 > canvas.height - 50) {
+                    this.y = canvas.height - 50 - this.height / 2;
+                    this.vy = 0;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                // Balloons
+                if (this.balloons > 0) {
+                    ctx.strokeStyle = '#fff';
+                    ctx.beginPath();
+                    ctx.moveTo(0, -20);
+                    ctx.lineTo(-10, -50);
+                    ctx.moveTo(0, -20);
+                    ctx.lineTo(10, -50);
+                    ctx.stroke();
+
+                    // Balloon 1
+                    ctx.fillStyle = '#e74c3c';
+                    ctx.beginPath();
+                    ctx.ellipse(-10, -55, 12, 15, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                    ctx.beginPath();
+                    ctx.ellipse(-13, -58, 3, 5, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Balloon 2
+                    ctx.fillStyle = '#3498db';
+                    ctx.beginPath();
+                    ctx.ellipse(10, -55, 12, 15, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                    ctx.beginPath();
+                    ctx.ellipse(7, -58, 3, 5, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Draw Girl Body
+                ctx.fillStyle = '#9b59b6';
+                ctx.beginPath();
+                ctx.moveTo(0, -10);
+                ctx.lineTo(-10, 20);
+                ctx.lineTo(10, 20);
+                ctx.fill();
+
+                // Draw Custom Face (Girl)
+                try {
+                    const size = 60; // Size
+                    ctx.save();
+                    ctx.translate(0, -30); // Position
+
+                    ctx.beginPath();
+                    ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
+                    ctx.closePath();
+                    ctx.clip();
+
+                    if (!this.facingRight) {
+                        ctx.scale(-1, 1);
+                    }
+
+                    const zoom = 1.5;
+                    ctx.drawImage(girlImg, -size * zoom / 2, -size * zoom / 2, size * zoom, size * zoom);
+
+                    ctx.restore();
+
+                } catch (e) {
+                    ctx.fillStyle = '#ffe0b2';
+                    ctx.beginPath();
+                    ctx.arc(0, -15, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+        }
+
+        class Obstacle {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.startX = x;
+                this.startY = y;
+                this.type = type;
+                this.size = 20;
+                this.speed = Math.random() * 2 + 1;
+                this.dir = 1;
+                this.angle = 0;
+            }
+
+            update(dt) {
+                if (this.type === 'horizontal') {
+                    this.x += (this.speed * this.dir) * dt;
+                    if (this.x > canvas.width + 50) this.x = -50;
+                    if (this.x < -50) this.x = canvas.width + 50;
+                } else if (this.type === 'vertical') {
+                    this.y = this.startY + Math.sin(Date.now() * 0.002) * 50;
+                } else if (this.type === 'circle') {
+                    this.angle += 0.05 * dt;
+                    this.x = this.startX + Math.cos(this.angle) * 50;
+                    this.y = this.startY + Math.sin(this.angle) * 50;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.fillStyle = '#546e7a';
+                ctx.beginPath();
+                ctx.arc(0, 0, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#37474f';
+                ctx.lineWidth = 2;
+                for (let i = 0; i < 8; i++) {
+                    let a = (Math.PI * 2 / 8) * i + frames * 0.05;
+                    let sx = Math.cos(a) * (this.size + 5);
+                    let sy = Math.sin(a) * (this.size + 5);
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(sx, sy);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+        }
+
+        class Collectible {
+            constructor(x, y) {
+                this.x = x;
+                this.baseY = y;
+                this.y = y;
+                this.size = 15;
+                this.collected = false;
+                this.floatOffset = Math.random() * Math.PI * 2;
+            }
+
+            update(dt) {
+                this.y = this.baseY + Math.sin(Date.now() * 0.003 + this.floatOffset) * 10;
+            }
+
+            draw() {
+                if (this.collected) return;
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.fillStyle = '#f1c40f';
+                ctx.beginPath();
+                for (let i = 0; i < 5; i++) {
+                    ctx.lineTo(Math.cos((18 + i * 72) * 0.0174533) * this.size,
+                        -Math.sin((18 + i * 72) * 0.0174533) * this.size);
+                    ctx.lineTo(Math.cos((54 + i * 72) * 0.0174533) * (this.size / 2),
+                        -Math.sin((54 + i * 72) * 0.0174533) * (this.size / 2));
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = '#f39c12';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        class Portal {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.active = false;
+                this.radius = 0;
+            }
+
+            update(dt) {
+                if (this.active && this.radius < 40) {
+                    this.radius += 2 * dt;
+                }
+            }
+
+            draw() {
+                if (!this.active) return;
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(frames * 0.05);
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 3;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.fill();
+                ctx.restore();
+
+                if (this.active) {
+                    ctx.fillStyle = '#fff';
+                    ctx.font = '16px Fredoka One';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('Next Year', this.x, this.y - 50);
+                }
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color, type = 'normal') {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.type = type;
+                this.life = 100;
+
+                if (type === 'firework') {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = Math.random() * 6 + 2;
+                    this.vx = Math.cos(angle) * speed;
+                    this.vy = Math.sin(angle) * speed;
+                    this.size = Math.random() * 3 + 1;
+                    this.decay = Math.random() * 1.5 + 0.5;
+                } else {
+                    this.vx = (Math.random() - 0.5) * 6;
+                    this.vy = (Math.random() - 0.5) * 6;
+                    this.size = Math.random() * 5 + 2;
+                    this.decay = 2;
+                }
+            }
+
+            update(dt) {
+                this.x += this.vx * dt;
+                this.y += this.vy * dt;
+
+                if (this.type === 'firework') {
+                    this.vy += 0.1 * dt;
+                    this.vx *= 0.95;
+                    this.vy *= 0.95;
+                }
+
+                this.life -= this.decay * dt;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.life / 100);
+
+                if (this.type === 'firework') {
+                    ctx.globalCompositeOperation = 'lighter';
+                }
+
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        // ------------------ GAME LOGIC ------------------
+
+        function getOrdinal(n) {
+            var s = ["th", "st", "nd", "rd"];
+            var v = n % 100;
+            return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        }
+
+        function initLevel(lvl) {
+            level = lvl;
+            player = new Player();
+            particles = [];
+            obstacles = [];
+            collectibles = [];
+            parents = [];
+
+            if (fireworkInterval) {
+                clearInterval(fireworkInterval);
+                fireworkInterval = null;
+            }
+
+            hudLevel.innerText = `Age: ${level}`;
+            hudScore.innerText = `Memories: 0/3`;
+            finalMessage.style.opacity = 0;
+
+            giftContainer.style.display = 'none';
+            giftContainer.classList.remove('hidden');
+            surpriseContainer.classList.add('hidden');
+            familyQuote.classList.add('hidden');
+
+            if (level === maxLevels) {
+                initBirthdayLevel();
+            } else {
+                initStandardLevel(lvl);
+            }
+
+            gameState = 'PLAYING';
+        }
+
+        function initStandardLevel(lvl) {
+            portal = new Portal(canvas.width - 100, canvas.height - 100);
+
+            const count = 3;
+            for (let i = 0; i < count; i++) {
+                let cx = 200 + Math.random() * (canvas.width - 300);
+                let cy = 50 + Math.random() * (canvas.height - 150);
+                collectibles.push(new Collectible(cx, cy));
+            }
+
+            let obsCount = (lvl - 1) * 2;
+            if (obsCount > 15) obsCount = 15;
+
+            for (let i = 0; i < obsCount; i++) {
+                let ox = 300 + Math.random() * (canvas.width - 400);
+                let oy = Math.random() * (canvas.height - 100);
+                let type = 'static';
+
+                if (lvl > 3) type = Math.random() > 0.5 ? 'horizontal' : 'static';
+                if (lvl > 6) type = Math.random() > 0.5 ? 'vertical' : 'horizontal';
+                if (lvl > 8) type = 'circle';
+
+                obstacles.push(new Obstacle(ox, oy, type));
+            }
+        }
+
+        function initBirthdayLevel() {
+            collectibles = [];
+            obstacles = [];
+            portal = null;
+            cake = { x: canvas.width / 2, y: canvas.height - 60, w: 100, h: 60 };
+            parents.push({ x: canvas.width / 2 - 80, y: canvas.height - 110, role: 'dad' });
+            parents.push({ x: canvas.width / 2 + 80, y: canvas.height - 110, role: 'mom' });
+
+            hudScore.innerText = "Memories: A lot";
+
+            const bdayHeader = document.getElementById('bday-header');
+            if (bdayHeader) {
+                bdayHeader.innerText = `Happy ${getOrdinal(maxLevels)} Birthday Sakina !!!`;
+            }
+        }
+
+        function update(dt) {
+            if (gameState !== 'PLAYING' && gameState !== 'CUTSCENE' && gameState !== 'ENDED') return;
+
+            frames++;
+            player.update(dt);
+
+            obstacles.forEach(o => o.update(dt));
+            collectibles.forEach(c => c.update(dt));
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.update(dt);
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            if (portal) portal.update(dt);
+
+            if (gameState === 'PLAYING') {
+                checkCollisions();
+            }
+
+            if (level === maxLevels && gameState === 'PLAYING') {
+                let dx = player.x - cake.x;
+                let dy = player.y - (canvas.height - 50);
+                if (Math.abs(dx) < 150 && player.y > canvas.height - 150) {
+                    startEndingCutscene();
+                }
+            }
+        }
+
+        function checkCollisions() {
+            let collectedCount = 0;
+            collectibles.forEach(c => {
+                let dx = player.x - c.x;
+                let dy = player.y - c.y;
+                let dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < player.radius + c.size && !c.collected) {
+                    c.collected = true;
+                    createParticles(c.x, c.y, 10, '#f1c40f');
+                }
+                if (c.collected) collectedCount++;
+            });
+
+            hudScore.innerText = `Memories: ${collectedCount}/3`;
+
+            if (portal && collectedCount === 3 && !portal.active) {
+                portal.active = true;
+                createParticles(portal.x, portal.y, 20, '#fff');
+            }
+
+            if (portal && portal.active) {
+                let dx = player.x - portal.x;
+                let dy = player.y - portal.y;
+                if (Math.sqrt(dx * dx + dy * dy) < 40) {
+                    completeLevel();
+                }
+            }
+
+            obstacles.forEach(o => {
+                let dx = player.x - o.x;
+                let dy = player.y - o.y;
+                if (Math.sqrt(dx * dx + dy * dy) < player.radius + o.size - 5) {
+                    gameOver();
+                }
+            });
+        }
+
+        function createParticles(x, y, count, color, type) {
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle(x, y, color, type));
+            }
+        }
+
+        function draw() {
+            let bgIndex = level - 1;
+            if (bgIndex >= levelColors.length) bgIndex = levelColors.length - 1;
+            ctx.fillStyle = levelColors[bgIndex];
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#2c3e50';
+            ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
+
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.beginPath();
+            ctx.arc(100 + Math.sin(frames * 0.01) * 50, 100, 40, 0, Math.PI * 2);
+            ctx.arc(150 + Math.sin(frames * 0.01) * 50, 90, 50, 0, Math.PI * 2);
+            ctx.arc(200 + Math.sin(frames * 0.01) * 50, 100, 40, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (portal) portal.draw();
+            obstacles.forEach(o => o.draw());
+            collectibles.forEach(c => c.draw());
+
+            if (level === maxLevels) {
+                drawBirthdayScene();
+            }
+
+            player.draw();
+            particles.forEach(p => p.draw());
+        }
+
+        function drawBirthdayScene() {
+            parents.forEach(p => {
+                ctx.save();
+                ctx.translate(p.x, p.y);
+
+                try {
+                    // Draw Body (Restored)
+                    ctx.fillStyle = p.role === 'dad' ? '#34495e' : '#e91e63';
+                    ctx.fillRect(-15, 0, 30, 90);
+
+                    // Draw Avatar Head
+                    const size = 100; // Large size
+                    ctx.save();
+                    ctx.translate(0, -50); // Adjusted Y
+
+                    // Clip to Circle
+                    ctx.beginPath();
+                    ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
+                    ctx.closePath();
+                    ctx.clip();
+
+                    // Zoom Hack 1.5x
+                    const zoom = 1.5;
+                    if (p.role === 'dad') {
+                        ctx.drawImage(dadImg, -size * zoom / 2, -size * zoom / 2, size * zoom, size * zoom);
+                    } else {
+                        ctx.drawImage(momImg, -size * zoom / 2, -size * zoom / 2, size * zoom, size * zoom);
+                    }
+
+                    ctx.restore();
+                } catch (e) {
+                    ctx.fillStyle = p.role === 'dad' ? '#34495e' : '#e91e63';
+                    ctx.fillRect(-15, 0, 30, 90);
+                    ctx.fillStyle = '#ffe0b2';
+                    ctx.beginPath();
+                    ctx.arc(0, -15, 20, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            });
+
+            ctx.save();
+            ctx.translate(cake.x, cake.y);
+            ctx.fillStyle = '#8e44ad';
+            ctx.fillRect(-60, 40, 120, 10);
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(-50, 0, 100, 40);
+            ctx.fillStyle = '#ffc0cb';
+            ctx.fillRect(-50, 0, 100, 10);
+
+            for (let i = 0; i < 10; i++) {
+                let cx = -40 + i * 9;
+                ctx.fillStyle = '#f1c40f';
+                ctx.fillRect(cx, -15, 4, 15);
+                if (frames % 10 < 5) {
+                    ctx.fillStyle = '#e67e22';
+                    ctx.beginPath();
+                    ctx.arc(cx + 2, -18, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            ctx.restore();
+        }
+
+        function gameOver() {
+            gameState = 'GAMEOVER';
+            gameOverScreen.classList.remove('hidden');
+        }
+
+        function completeLevel() {
+            gameState = 'LEVEL_END';
+            if (level < maxLevels) {
+                levelTitle.innerText = `Age ${level} Complete!`;
+                levelScreen.classList.remove('hidden');
+            }
+        }
+
+        function nextLevel() {
+            level++;
+            levelScreen.classList.add('hidden');
+            initLevel(level);
+        }
+
+        function startEndingCutscene() {
+            gameState = 'CUTSCENE';
+            keys.ArrowLeft = false;
+            keys.ArrowRight = false;
+            keys.Space = false;
+
+            let interval = setInterval(() => {
+                if (gameState === 'ENDED') {
+                    clearInterval(interval);
+                    return;
+                }
+
+                let dx = player.x - cake.x;
+                if (Math.abs(dx) > 10) {
+                    player.x -= Math.sign(dx) * 1;
+                    player.facingRight = dx < 0;
+                    if (frames % 20 === 0 && player.y > canvas.height - 40) player.vy = -3;
+                } else {
+                    clearInterval(interval);
+                    triggerFinale();
+                }
+            }, 16);
+        }
+
+        function triggerFinale() {
+            gameState = 'ENDED';
+            player.vx = 0;
+            player.vy = 0;
+            player.y = canvas.height - 20 - player.height / 2;
+
+            parents[0].x = player.x - 40;
+            parents[1].x = player.x + 40;
+
+            // Initial explosion
+            for (let i = 0; i < 60; i++) {
+                setTimeout(() => {
+                    createParticles(Math.random() * canvas.width, Math.random() * canvas.height / 2 + 50, 40, getRandomColor(), 'firework');
+                }, i * 50);
+            }
+
+            finalMessage.style.opacity = 1;
+
+            giftContainer.style.display = 'block';
+
+            // Continuous fireworks loop
+            fireworkInterval = setInterval(() => {
+                if (particles.length > 400) return;
+
+                let ex = Math.random() * (canvas.width * 0.8) + (canvas.width * 0.1);
+                let ey = Math.random() * (canvas.height * 0.4) + 50;
+                createParticles(ex, ey, 30, getRandomColor(), 'firework');
+            }, 800);
+        }
+
+        // --- NEW GIFT REVEAL FUNCTION ---
+        function openGift() {
+            const giftBox = document.getElementById('gift-container');
+            const surprise = document.getElementById('surprise-container');
+            const quote = document.getElementById('family-quote');
+
+            // Hide Gift
+            giftBox.style.display = 'none';
+
+            // Explosion Effect at center
+            createParticles(canvas.width / 2, canvas.height / 2, 100, '#FFD700', 'firework');
+            createParticles(canvas.width / 2, canvas.height / 2, 50, '#e91e63', 'firework');
+
+            // Show Surprise
+            surprise.classList.remove('hidden');
+
+            // Fade in Quote after short delay
+            setTimeout(() => {
+                quote.classList.remove('hidden');
+                quote.style.opacity = 1;
+            }, 1000);
+        }
+
+        function getRandomColor() {
+            const colors = ['#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#3498db', '#9b59b6'];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        window.addEventListener('keydown', e => {
+            if (e.code === 'ArrowLeft') keys.ArrowLeft = true;
+            if (e.code === 'ArrowRight') keys.ArrowRight = true;
+            if (e.code === 'Space' || e.code === 'ArrowUp') {
+                e.preventDefault(); // Prevent scrolling/button clicking
+                if (!keys.Space) player.flap();
+                keys.Space = true;
+            }
         });
 
-        const mockStatusApi = (id, attempt) => new Promise(resolve => {
-            const POLLING_INTERVAL = 1500;
-            setTimeout(() => {
-                let currentStatus, details;
-                
-                // Simulate success after 4 polls
-                if (attempt >= 4) {
-                    currentStatus = 'SUCCESS';
-                    details = 'Job completed successfully. Ready for deployment.';
-                } 
-                // Simulate failure path occasionally
-                else if (attempt === 2 && Math.random() < 0.1) {
-                    currentStatus = 'FAILURE';
-                    details = 'Job failed due to a mock resource error.';
-                } 
-                // Still running
-                else {
-                    currentStatus = 'POLLING';
-                    details = `Processing in progress... (Poll ${attempt}/4)`;
-                }
-
-                resolve({ status: currentStatus, details });
-            }, POLLING_INTERVAL);
+        window.addEventListener('keyup', e => {
+            if (e.code === 'ArrowLeft') keys.ArrowLeft = false;
+            if (e.code === 'ArrowRight') keys.ArrowRight = false;
+            if (e.code === 'Space' || e.code === 'ArrowUp') keys.Space = false;
         });
 
-        const mockDeployApi = (id) => new Promise((resolve, reject) => {
-            setTimeout(() => {
-                // 1 in 5 chance of deployment failure simulation
-                if (Math.random() < 0.2) {
-                    reject({ status: 500, message: 'Deployment failed: Infrastructure error.' });
-                } else {
-                    resolve({ status: 200, message: 'Journey is deployed successfully' });
-                }
-            }, 1500);
+        const btnLeft = document.getElementById('btn-left');
+        const btnRight = document.getElementById('btn-right');
+        const btnFlap = document.getElementById('btn-flap');
+
+        const addTouch = (elem, code) => {
+            elem.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (code === 'Space') player.flap();
+                keys[code] = true;
+            }, { passive: false });
+            elem.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                keys[code] = false;
+            }, { passive: false });
+        };
+
+        addTouch(btnLeft, 'ArrowLeft');
+        addTouch(btnRight, 'ArrowRight');
+        addTouch(btnFlap, 'Space');
+
+        document.getElementById('start-btn').addEventListener('click', (e) => {
+            e.target.blur(); // Remove focus
+
+            // Attempt Fullscreen
+            if (document.documentElement.requestFullscreen && ('ontouchstart' in window)) {
+                document.documentElement.requestFullscreen().catch(err => { });
+            }
+
+            startScreen.classList.add('hidden');
+            initLevel(1);
+
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            lastTime = performance.now();
+            loop(lastTime);
         });
 
-        // --- Real API Placeholders ---
+        document.getElementById('next-level-btn').addEventListener('click', (e) => {
+            e.target.blur();
+            nextLevel();
+        });
 
-        const realSubmitApi = async (query) => {
-            console.log(`Making REAL API SUBMIT call to: ${REAL_API_URLS.SUBMIT}`);
-            await new Promise(r => setTimeout(r, 500)); 
-            throw new Error(`Real API endpoint not accessible: ${REAL_API_URLS.SUBMIT}`);
-        };
+        document.getElementById('retry-btn').addEventListener('click', (e) => {
+            e.target.blur();
+            gameOverScreen.classList.add('hidden');
+            initLevel(level);
+        });
 
-        const realStatusApi = async (id, attempt) => {
-            console.log(`Making REAL API STATUS call to: ${REAL_API_URLS.STATUS}/${id}`);
-            await new Promise(r => setTimeout(r, 500));
-            throw new Error('Real API not accessible. Check network configuration.');
-        };
+        function loop(timestamp) {
+            // Calculate delta time (dt)
+            // Divide by 16.666 to normalize to ~60FPS
+            // (16.66ms is one frame at 60FPS)
+            const dt = (timestamp - lastTime) / 16.666;
+            lastTime = timestamp;
 
-        const realDeployApi = async (id) => {
-            console.log(`Making REAL API DEPLOY call to: ${REAL_API_URLS.DEPLOY}/${id}`);
-            await new Promise(r => setTimeout(r, 500));
-            throw new Error('Real API not accessible. Check network configuration.');
-        };
+            // Cap dt to prevent huge jumps if tab is inactive
+            // If dt is too high (e.g. > 4), pretend it's just 1 frame
+            const safeDt = Math.min(dt, 4);
 
-        // --- Core Logic ---
+            update(safeDt);
+            draw();
+            animationFrameId = requestAnimationFrame(loop);
+        }
 
-        const updateUI = () => {
-            // State checks
-            const isIdle = status === 'IDLE';
-            const isSubmittingOrRunning = status === 'SUBMITTING' || status === 'POLLING' || status === 'DEPLOYING';
-            const isDeployReady = status === 'SUCCESS';
-            const isSuccess = status === 'DEPLOY_SUCCESS';
-            const isFailure = status.includes('FAILURE');
-            const showReset = isFailure || isSuccess;
-
-            // --- Input and Submit Button ---
-            queryInput.disabled = isSubmittingOrRunning || isSuccess;
-            submitButton.disabled = isSubmittingOrRunning || isSuccess || queryInput.value.trim() === '';
-            queryInput.placeholder = isSubmittingOrRunning ? "Job running, input disabled..." : "Type your query here...";
-
-            // Update submit button icon
-            if (isSubmittingOrRunning) {
-                submitIcon.innerHTML = ICON.LOADER('w-5 h-5 animate-spin text-primary-gold').replace(/w-16 h-16/g, 'w-5 h-5');
-            } else {
-                submitIcon.innerHTML = ICON.SEND;
-            }
-
-            // --- Deploy and Reset Buttons ---
-            deployButton.classList.toggle('hidden', !isDeployReady);
-            deployButton.disabled = status === 'DEPLOYING';
-            resetButton.classList.toggle('hidden', !showReset);
-
-            // --- Status Display ---
-            journeyIdDisplay.classList.toggle('hidden', !journeyId);
-            if (journeyId) {
-                journeyIdValue.textContent = journeyId;
-            }
-
-            let colorClass = 'text-gray-400';
-            mainStatusIcon.innerHTML = '';
-
-            if (isSuccess) {
-                colorClass = 'text-primary-green font-semibold';
-                mainStatusIcon.innerHTML = ICON.CHECK('text-primary-green');
-            } else if (isFailure) {
-                colorClass = 'text-red-500 font-semibold';
-                mainStatusIcon.innerHTML = ICON.X('text-red-500');
-            } else if (isDeployReady) {
-                colorClass = 'text-primary-blue';
-                mainStatusIcon.innerHTML = ICON.TERMINAL('text-primary-blue');
-            } else if (isSubmittingOrRunning) {
-                colorClass = 'text-primary-gold';
-                mainStatusIcon.innerHTML = ICON.LOADER('text-primary-gold');
-            }
-
-            messageDisplay.className = `text-lg transition-colors duration-500 ${colorClass}`;
-            messageDisplay.textContent = messageDisplay.textContent; // Trigger re-render of content
-            
-            // --- API Mode Toggle Appearance ---
-            configToggleContainer.classList.remove('bg-amber-900/30', 'border-amber-500/50', 'bg-blue-900/30', 'border-blue-500/50');
-            if (useMockApi) {
-                apiModeLabel.textContent = 'Mock API Mode';
-                footerMessage.textContent = 'Using mock API calls for demonstration.';
-                configToggleContainer.classList.add('bg-amber-900/30', 'border-amber-500/50');
-                toggleIconRight.classList.remove('hidden');
-                toggleIconLeft.classList.add('hidden');
-            } else {
-                apiModeLabel.textContent = 'Real API Mode (Simulated Errors)';
-                footerMessage.textContent = 'Attempting real API calls (Simulated errors).';
-                configToggleContainer.classList.add('bg-blue-900/30', 'border-blue-500/50');
-                toggleIconRight.classList.add('hidden');
-                toggleIconLeft.classList.remove('hidden');
-            }
-            // Disable toggle button if a process is active
-            toggleApiButton.disabled = isSubmittingOrRunning && !showReset;
-            toggleApiButton.classList.toggle('opacity-50', toggleApiButton.disabled);
-        };
-
-        const updateState = (newStatus, newMessage, newJourneyId = journeyId) => {
-            status = newStatus;
-            messageDisplay.textContent = newMessage;
-            journeyId = newJourneyId;
-            updateUI();
-        };
-        
-        // --- Asynchronous Logic ---
-
-        const getSubmitApi = () => useMockApi ? mockSubmitApi : realSubmitApi;
-        const getStatusApi = () => useMockApi ? mockStatusApi : realStatusApi;
-        const getDeployApi = () => useMockApi ? mockDeployApi : realDeployApi;
-
-
-        const pollStatus = async () => {
-            if (status !== 'POLLING' || !journeyId) {
-                return;
-            }
-
-            clearTimeout(pollingTimer);
-            pollCount++;
-            
-            const statusApi = getStatusApi();
-            
-            try {
-                const { status: newStatus, details } = await statusApi(journeyId, pollCount); 
-
-                if (newStatus === 'SUCCESS') {
-                    updateState('SUCCESS', 'Job complete! Review the result and proceed to deployment.');
-                } else if (newStatus === 'FAILURE') {
-                    updateState('FAILURE', `Job failed: ${details}. Please try a different query.`);
-                } else {
-                    updateState('POLLING', `Status: ${details}. Hang tight—sip coffee, sit back, and relax.`);
-                    // Continue polling
-                    const interval = useMockApi ? 1500 : 2000;
-                    pollingTimer = setTimeout(pollStatus, interval); 
-                }
-
-            } catch (error) {
-                updateState('FAILURE', `An API error occurred during polling: ${error.message}`);
-            }
-        };
-
-        // --- Event Handlers ---
-
-        const handleReset = () => {
-            clearTimeout(pollingTimer);
-            queryInput.value = '';
-            pollCount = 0;
-            updateState('IDLE', 'Enter your prompt to start the journey.', null);
-        };
-
-        const handleDeploy = async () => {
-            if (status !== 'SUCCESS' || !journeyId) return;
-
-            updateState('DEPLOYING', 'Deploying your journey...');
-
-            try {
-                const deployApi = getDeployApi();
-                const { status: deployStatus, message: deployMsg } = await deployApi(journeyId);
-                
-                if (deployStatus === 200) {
-                    updateState('DEPLOY_SUCCESS', `${deployMsg} with journey ID: ${journeyId}`);
-                } else {
-                    updateState('DEPLOY_FAILURE', `Deployment failed (HTTP ${deployStatus || 'Unknown'}): ${deployMsg}`);
-                }
-            
-            } catch (error) {
-                updateState('DEPLOY_FAILURE', `Deployment failed (HTTP Error): ${error.message}.`);
-            }
-        };
-
-        const handleSubmit = async (e) => {
-            e.preventDefault();
-            if (status !== 'IDLE' && status !== 'FAILURE') return;
-
-            const trimmedQuery = queryInput.value.trim();
-            if (!trimmedQuery) {
-                updateState('IDLE', 'Please enter a query before submitting.');
-                return;
-            }
-
-            // Reset necessary state and UI elements
-            handleReset(); 
-            queryInput.value = trimmedQuery; // Preserve entered query visually for context
-            updateState('SUBMITTING', 'Submitting query...');
-
-            try {
-                const submitApi = getSubmitApi();
-                const { journeyId: newId, message: submitMsg } = await submitApi(trimmedQuery);
-                
-                updateState('POLLING', submitMsg + ' Now polling for status...', newId);
-                // First poll is triggered by the pollStatus check inside the main event loop (or immediate call if needed)
-
-            } catch (error) {
-                updateState('FAILURE', `Submission failed: ${error.message}`);
-            }
-        };
-        
-        const handleApiToggle = () => {
-            if (status === 'IDLE' || status === 'FAILURE' || status === 'DEPLOY_SUCCESS' || status === 'DEPLOY_FAILURE') {
-                useMockApi = !useMockApi;
-                handleReset(); // Reset flow when switching mode
-            } else {
-                updateState(status, 'Cannot switch API mode while a job is running. Reset first.');
-            }
-        };
-
-        // --- Initialization and Event Listeners ---
-        window.onload = function() {
-            updateUI(); // Initial render of UI state
-            document.getElementById('query-form').addEventListener('submit', handleSubmit);
-            deployButton.addEventListener('click', handleDeploy);
-            resetButton.addEventListener('click', handleReset);
-            toggleApiButton.addEventListener('click', handleApiToggle);
-
-            // Optional: Listen to input changes to enable submit button
-            queryInput.addEventListener('input', updateUI);
-        };
     </script>
 </body>
+
 </html>
